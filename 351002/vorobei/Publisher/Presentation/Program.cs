@@ -10,14 +10,20 @@ using Infrastructure.Kafka;
 using Infrastructure.RepositoriesImplementation;
 using Infrastructure.ServiceImplementation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = "localhost:6379";
+    options.InstanceName = "distcomp_";
+});
 
 builder.Services.AddSingleton<IModerationResultWaiter, ModerationResultWaiter>();
 builder.Services.AddSingleton<PostModerationProducer>();
 builder.Services.AddHostedService<PostModerationResultConsumer>();
 
-// 4. Регистрируем DB Context (оставляем)
 builder.Services.AddDbContext<DistcompContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -28,7 +34,6 @@ builder.Services.AddDbContext<DistcompContext>(options =>
 
 builder.Services.AddControllers();
 
-// 5. Регистрируем репозитории (оставляем)
 builder.Services.AddScoped<IRepository<Creator>, EfCoreRepository<Creator>>();
 builder.Services.AddScoped<IBaseService<CreatorRequestTo, CreatorResponseTo>, CreatorService>();
 builder.Services.AddScoped<IRepository<Mark>, EfCoreRepository<Mark>>();
@@ -41,9 +46,10 @@ builder.Services.AddScoped<IBaseService<StoryRequestTo, StoryResponseTo>>(provid
     var markRepository = provider.GetRequiredService<IRepository<Mark>>();
     var context = provider.GetRequiredService<DistcompContext>();
     var mapper = provider.GetRequiredService<IMapper>();
-    return new StoryService(storyRepository, creatorRepository, markRepository, context, mapper);
-});
+    var cache = provider.GetRequiredService<IDistributedCache>();
 
+    return new StoryService(storyRepository, creatorRepository, markRepository, mapper, cache);
+});
 builder.Services.AddScoped<IBaseService<PostRequestTo, PostResponseTo>, PostService>();
 
 builder.Services.AddSingleton(provider =>
