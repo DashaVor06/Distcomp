@@ -85,7 +85,6 @@ public class BaseService<TEntity, TEntityRequest, TEntityResponse> : IBaseServic
         await _repository.CreateAsync(entity);
 
         var response = _mapper.Map<TEntityResponse>(entity);
-        await SetCacheAsync(GetCacheKey(entity.Id), response);
 
         // ВАЖНО: Очищаем список "всех", так как он изменился
         await InvalidateAllCacheAsync();
